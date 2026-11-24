@@ -76,12 +76,13 @@ function nextNumber(kind) {
   return String(state[key]).padStart(4, '0');
 }
 
-async function createPrivateChannel(guild, categoryId, name, user) {
+async function createPrivateChannel(guild, categoryId, name, user, ticketType, number) {
   const everyone = guild.roles.everyone;
   return guild.channels.create({
     name,
     type: ChannelType.GuildText,
     parent: categoryId,
+    topic: `otm-ticket;owner=${user.id};type=${ticketType};number=${number}`,
     permissionOverwrites: [
       { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
       {
@@ -196,12 +197,34 @@ client.on('interactionCreate', async interaction => {
       const guild = interaction.guild;
       const number = nextNumber('support');
       const channelName = `otm-${safeChannelPart(interaction.user.username)}-destek-${number}`;
-      const channel = await createPrivateChannel(guild, config.categories.support, channelName, interaction.user);
+      const channel = await createPrivateChannel(guild, config.categories.support, channelName, interaction.user, 'support', number);
 
       await channel.send({
-        content: `Merhaba ${interaction.user}, destek talebiniz oluşturuldu. Sorununuzu buraya yazabilirsiniz.\n\nDestek numarası: **${number}**`
+        content: `Merhaba ${interaction.user}, destek talebiniz oluşturuldu. Sorununuzu buraya yazabilirsiniz.\n\nDestek numarası: **${number}**`,
+        components: [new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('otm_ticket_close').setLabel('Ticket Kapat').setStyle(ButtonStyle.Danger)
+        )]
       });
       return interaction.reply({ content: `Destek kanalınız oluşturuldu: ${channel}`, ephemeral: true });
+    }
+
+    if (interaction.isButton() && interaction.customId === 'otm_ticket_close') {
+      const channel = interaction.channel;
+      const topic = channel?.topic || '';
+      const ownerMatch = /(?:^|;)owner=(\\d+)(?:;|$)/.exec(topic);
+      const isOtmTicket = topic.startsWith('otm-ticket;') && ownerMatch;
+      if (!isOtmTicket) {
+        return interaction.reply({ content: 'Bu kanal geçerli bir OTM ticket kanalı değil.', ephemeral: true });
+      }
+
+      const isOwner = ownerMatch[1] === interaction.user.id;
+      if (!isOwner && !isStaff(interaction.member)) {
+        return interaction.reply({ content: 'Bu ticketı yalnızca ticket sahibi veya OTM yetkilileri kapatabilir.', ephemeral: true });
+      }
+
+      await interaction.reply({ content: 'Ticket kapatılıyor...', ephemeral: true });
+      await channel.delete(`OTM ticket ${interaction.user.tag} tarafından kapatıldı.`);
+      return;
     }
 
     if (interaction.isButton() && interaction.customId === 'otm_delivery_create') {
@@ -253,7 +276,9 @@ client.on('interactionCreate', async interaction => {
           interaction.guild,
           config.categories.deliveryWaiting,
           channelName,
-          interaction.user
+          interaction.user,
+          'delivery',
+          number
         );
 
         codeEntry.used = true;
@@ -262,7 +287,10 @@ client.on('interactionCreate', async interaction => {
         writeJson(CODES_FILE, inventory);
 
         await channel.send({
-          content: `Merhaba ${interaction.user}, teslimat talebiniz alındı. OTM ekibi sizinle bu kanaldan ilgilenecek.\n\n**Teslimat No:** ${number}\n**Kod miktarı:** ${Number(match[2]).toLocaleString('tr-TR')} OwO Cash`
+          content: `Merhaba ${interaction.user}, teslimat talebiniz alındı. OTM ekibi sizinle bu kanaldan ilgilenecek.\n\n**Teslimat No:** ${number}\n**Kod miktarı:** ${Number(match[2]).toLocaleString('tr-TR')} OwO Cash`,
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('otm_ticket_close').setLabel('Ticket Kapat').setStyle(ButtonStyle.Danger)
+          )]
         });
 
         const deliveryChannel = await interaction.guild.channels.fetch(config.channels.delivery);
