@@ -122,6 +122,19 @@ async function ensurePanel(guild, channelId, stateKey, embed, button) {
     return;
   }
 
+  // Teslimat kanalında üyeler mesaj gönderemez; bot panel ve teslimat duyurularını gönderebilir.
+  if (stateKey === 'deliveryPanelMessageId') {
+    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+      SendMessages: false
+    });
+    await channel.permissionOverwrites.edit(client.user.id, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true,
+      EmbedLinks: true
+    });
+  }
+
   const savedId = state[stateKey];
   if (savedId) {
     try {
