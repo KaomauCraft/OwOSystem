@@ -211,7 +211,7 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isButton() && interaction.customId === 'otm_ticket_close') {
       const channel = interaction.channel;
       const topic = channel?.topic || '';
-      const ownerMatch = /(?:^|;)owner=(\\d+)(?:;|$)/.exec(topic);
+      const ownerMatch = /(?:^|;)owner=(\d+)(?:;|$)/.exec(topic);
       const isOtmTicket = topic.startsWith('otm-ticket;') && ownerMatch;
       if (!isOtmTicket) {
         return interaction.reply({ content: 'Bu kanal geçerli bir OTM ticket kanalı değil.', ephemeral: true });
