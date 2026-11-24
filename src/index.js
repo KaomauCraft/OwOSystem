@@ -127,6 +127,12 @@ async function ensurePanel(guild, channelId, stateKey, embed, button) {
     await channel.permissionOverwrites.edit(guild.roles.everyone, {
       SendMessages: false
     });
+    // Rol izinleri @everyone engelini aşabileceği için tüm sunucu rollerine de yazma kapatılır.
+    for (const role of guild.roles.cache.values()) {
+      if (role.id !== guild.roles.everyone.id) {
+        await channel.permissionOverwrites.edit(role.id, { SendMessages: false });
+      }
+    }
     await channel.permissionOverwrites.edit(client.user.id, {
       ViewChannel: true,
       SendMessages: true,
