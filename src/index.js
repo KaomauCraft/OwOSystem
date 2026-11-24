@@ -49,7 +49,7 @@ let inventory = readJson(CODES_FILE, []);
 let inventoryBusy = false;
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
   partials: [Partials.Channel]
 });
 
@@ -219,6 +219,27 @@ client.once('ready', async () => {
     deliveryEmbed,
     new ButtonBuilder().setCustomId('otm_delivery_create').setLabel('Teslimat Oluştur').setStyle(ButtonStyle.Success)
   );
+});
+
+client.on('guildMemberAdd', async member => {
+  try {
+    const roleId = member.user.bot ? config.roles.bot : config.roles.member;
+    if (!roleId) {
+      console.error('[OTM] Giriş rolü ayarlanmamış:', member.user.bot ? 'bot' : 'üye');
+      return;
+    }
+    await member.roles.add(roleId, member.user.bot
+      ? 'Sunucuya katılan bot/uygulama hesabı'
+      : 'Sunucuya katılan gerçek kullanıcı');
+    await sendLog(
+      member.guild,
+      member.user.bot ? 'Sunucuya Bot / Uygulama Katıldı' : 'Yeni Üye Katıldı',
+      `Hesap: ${member.user.tag} (${member.id})\nVerilen rol: <@&${roleId}>`,
+      member.user.bot ? 0x95A5A6 : 0x2ECC71
+    );
+  } catch (error) {
+    console.error('[OTM] Otomatik giriş rolü verilemedi:', error);
+  }
 });
 
 client.on('interactionCreate', async interaction => {
