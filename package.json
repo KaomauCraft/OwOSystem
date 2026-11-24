@@ -1,0 +1,16 @@
+{
+  "name": "owo-teslimat-merkezi",
+  "version": "1.0.0",
+  "description": "OwO Teslimat Merkezi (OTM) Discord botu",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.7"
+  }
+}
