@@ -179,7 +179,27 @@ async function ensurePanel(guild, channelId, stateKey, embed, button) {
       const existing = await channel.messages.fetch(savedId);
       if (existing) return;
     } catch {
-      // Panel silinmişse yeniden oluştur.
+      // Kayıtlı panel bulunamazsa kanal geçmişinde arama yapılır.
+    }
+  }
+
+  // Hosting yeniden başlatıldığında state.json sıfırlansa bile mevcut paneli bul.
+  // Böylece her açılışta aynı panelin tekrar gönderilmesi engellenir.
+  const recentMessages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+  if (recentMessages) {
+    const existingPanel = recentMessages.find(message =>
+      message.author.id === client.user.id &&
+      message.embeds.some(item => item.title === embed.data.title) &&
+      message.components.some(row =>
+        row.components.some(component => component.customId === button.data.custom_id)
+      )
+    );
+
+    if (existingPanel) {
+      state[stateKey] = existingPanel.id;
+      writeJson(STATE_FILE, state);
+      console.log(`[OTM] Mevcut panel bulundu, tekrar gönderilmedi: ${stateKey}`);
+      return;
     }
   }
 
