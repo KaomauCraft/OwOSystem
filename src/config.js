@@ -1,17 +1,56 @@
 module.exports = {
   botName: 'OwO Teslimat Merkezi (OTM)',
   guildId: '1574826827669831751',
+
   channels: {
-    delivery: '1574898522975633528',
-    support: '1574828293612642425',
-    announcements: '1574828363443339385',
+    contact: '1575231644296548453',
+    rules: '1575231723526955069',
+    announcements: '1575231764379607171',
+    events: '1575231919228981411',
     deliveryProof: '1574899832815100005',
+    support: '1574828293612642425',
+
+    chat: '1575232302261473341',
+    botCommands: '1575232330866495528',
+    gallery: '1575232364626321438',
+    suggestions: '1575232393705431090',
+    marketplace: '1575232459862442076',
+    owoCommands: '1575235309439033544',
+
+    delivery: '1574826828613292094',
+    serviceInfo: '1575238566177546330',
+    cardless: '1575238607399157872',
+
+    youtubePremium: '1575238648440291389',
+    spotifyPremium: '1575238716509651075',
+    disneyPlus: '1575238750584315985',
+    netflix: '1575238811468824697',
+
+    discordOwo: '1575238859946467379',
+    offlineMembers: '1575238893165486310',
+    onlineMembers: '1575238927596654592',
+    owoLevelAccounts: '1575238948639211520',
+    serverBoost: '1575238987948490872',
+
+    steamRandomKey: '1575239060585189509',
+
+    deliveryWaitingChannel: '1574898522975633528',
     logs: '1574898593716904006'
   },
+
   categories: {
+    serverInfo: '1575231582166450347',
+    community: '1575232240500084799',
+    orderDelivery: '1575232871919132804',
+    serviceInfo: '1575238324375916689',
+    premium: '1575238352695984138',
+    discordServices: '1575238384543076382',
+    steamServices: '1575238407414743151',
+
     support: '1574829399587688498',
     deliveryWaiting: '1574832490831548496'
   },
+
   roles: {
     owner: '1574827830708146287',
     distributor: '1574827422702899371',
