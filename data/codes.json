@@ -17,5 +17,10 @@
   { "code": "OTM-196853-200000", "used": false },
   { "code": "OTM-864271-200000", "used": false },
   { "code": "OTM-329518-200000", "used": false },
-  { "code": "OTM-548217-1000000", "used": false }
+  { "code": "OTM-548217-1000000", "used": false },
+  { "code": "OTM-739251-1000000", "used": false },
+  { "code": "OTM-482617-1000000", "used": false },
+  { "code": "OTM-915384-1000000", "used": false },
+  { "code": "OTM-263849-1000000", "used": false },
+  { "code": "OTM-857126-1000000", "used": false }
 ]
