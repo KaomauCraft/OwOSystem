@@ -14,7 +14,8 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  EmbedBuilder
+  EmbedBuilder,
+  SlashCommandBuilder
 } = require('discord.js');
 const config = require('./config');
 
@@ -194,6 +195,25 @@ client.once('ready', async () => {
   console.log(`[OTM] ${client.user.tag} olarak giriş yapıldı.`);
   const guild = await client.guilds.fetch(config.guildId);
 
+  await guild.commands.set([
+    new SlashCommandBuilder()
+      .setName('botyaz')
+      .setDescription('Bot üzerinden seçilen kanala mesaj gönderir.')
+      .addChannelOption(option =>
+        option.setName('kanal')
+          .setDescription('Mesajın gönderileceği kanal')
+          .setRequired(true)
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      )
+      .addStringOption(option =>
+        option.setName('mesaj')
+          .setDescription('Botun göndereceği mesaj')
+          .setRequired(true)
+          .setMaxLength(2000)
+      )
+      .toJSON()
+  ]);
+
   const supportEmbed = new EmbedBuilder()
     .setColor(0x5865F2)
     .setTitle('OTM | Destek Merkezi')
@@ -244,6 +264,35 @@ client.on('guildMemberAdd', async member => {
 
 client.on('interactionCreate', async interaction => {
   try {
+    if (interaction.isChatInputCommand() && interaction.commandName === 'botyaz') {
+      if (!isStaff(interaction.member)) {
+        return interaction.reply({
+          content: 'Bu komutu yalnızca OTM sahibi ve yetkilileri kullanabilir.',
+          ephemeral: true
+        });
+      }
+
+      const target = interaction.options.getChannel('kanal', true);
+      const messageText = interaction.options.getString('mesaj', true).trim();
+      if (!messageText) {
+        return interaction.reply({ content: 'Gönderilecek mesaj boş olamaz.', ephemeral: true });
+      }
+      if (!target.isTextBased() || typeof target.send !== 'function' || target.guildId !== interaction.guildId) {
+        return interaction.reply({ content: 'Geçerli bir sunucu yazı kanalı seçmelisin.', ephemeral: true });
+      }
+
+      await target.send({
+        content: messageText,
+        allowedMentions: { parse: [] }
+      });
+      await sendLog(
+        interaction.guild,
+        'Bot Üzerinden Mesaj Gönderildi',
+        `Gönderen: ${interaction.user.tag} (${interaction.user.id})\\nKanal: ${target}\\nMesaj: ${messageText.slice(0, 900)}`
+      );
+      return interaction.reply({ content: `Mesaj başarıyla ${target} kanalına gönderildi.`, ephemeral: true });
+    }
+
     if (interaction.isButton() && interaction.customId === 'otm_support_create') {
       const guild = interaction.guild;
       const number = nextNumber('support');
