@@ -486,7 +486,8 @@ client.on('interactionCreate', async interaction => {
           )]
         });
 
-        const deliveryChannel = await interaction.guild.channels.fetch(config.channels.delivery);
+        // Bekleyen teslimat bildirimi ve "İşlem Tamamlandı" butonu yalnızca teslimat-bekliyor kanalına gönderilir.
+        const deliveryChannel = await interaction.guild.channels.fetch(config.channels.deliveryWaitingChannel);
         if (deliveryChannel && deliveryChannel.isTextBased()) {
           const queueEmbed = new EmbedBuilder()
             .setColor(0xF1C40F)
