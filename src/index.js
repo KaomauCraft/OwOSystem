@@ -49,8 +49,9 @@ const state = readJson(STATE_FILE, {
 });
 
 let inventory = readJson(CODES_FILE, []);
-let inviteData = readJson(INVITES_FILE, { entries: [] });
+let inviteData = readJson(INVITES_FILE, { entries: [], totals: {} });
 if (!Array.isArray(inviteData.entries)) inviteData.entries = [];
+if (!inviteData.totals || typeof inviteData.totals !== 'object') inviteData.totals = {};
 const inviteCache = new Map();
 let inventoryBusy = false;
 
@@ -407,10 +408,34 @@ client.on('guildMemberAdd', async member => {
           joinedAt: new Date().toISOString(),
           active: true
         });
+
+        const inviterId = usedInvite.inviter.id;
+        const currentInviteUses = [...currentInvites.values()]
+          .filter(invite => invite.inviter?.id === inviterId)
+          .reduce((sum, invite) => sum + Number(invite.uses || 0), 0);
+        const previousTotal = Number(inviteData.totals[inviterId] || 0);
+        inviteData.totals[inviterId] = Math.max(currentInviteUses, previousTotal + 1);
         writeJson(INVITES_FILE, inviteData);
       }
     } catch (error) {
       console.error('[OTM] Üye daveti tespit edilemedi. Sunucuyu Yönet iznini kontrol edin:', error);
+    }
+
+    // Her yeni üyeyi özel davet karşılama kanalında duyur.
+    try {
+      const welcomeChannel = await member.guild.channels.fetch('1575615011093745754');
+      if (welcomeChannel && welcomeChannel.isTextBased()) {
+        const invitedByEntry = [...inviteData.entries].reverse().find(entry => entry.memberId === member.id);
+        const inviterId = invitedByEntry?.inviterId;
+        const inviterMention = inviterId ? `<@${inviterId}>` : 'davet eden kişi belirlenemedi';
+        const inviterTotal = inviterId ? Number(inviteData.totals[inviterId] || 0) : 0;
+        await welcomeChannel.send({
+          content: `Hoşgeldin, <@${member.id}>! Seni ${inviterMention} bu sunucuya davet etti ve sende girdin. Bundan ötürü Sana Çok Teşekkür Ederiz! ❤️ Şşş ${inviterMention}, senin toplam davetlerin \`${inviterTotal}\` oldu.`,
+          allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
+        });
+      }
+    } catch (error) {
+      console.error('[OTM] Davet karşılama mesajı gönderilemedi:', error);
     }
 
     const roleId = member.user.bot ? config.roles.bot : config.roles.member;
