@@ -454,23 +454,77 @@ client.on('inviteDelete', invite => {
 client.on('interactionCreate', async interaction => {
   try {
     if (interaction.isChatInputCommand() && interaction.commandName === 'invites') {
+      await interaction.deferReply({ ephemeral: true });
+
       const ownEntries = inviteData.entries.filter(entry => entry.inviterId === interaction.user.id);
-      const total = ownEntries.length;
-      const active = ownEntries.filter(entry => entry.active === true).length;
-      const left = total - active;
+      const ownTotal = ownEntries.length;
+      const ownActive = ownEntries.filter(entry => entry.active === true).length;
+      const ownLeft = ownTotal - ownActive;
+
+      // Discord'un hâlen mevcut davet bağlantılarındaki toplam kullanım sayılarını da göster.
+      // Bu sayılar davet bağlantısının ömrü boyunca birikir; tek tek eski üyeleri göstermez.
+      let liveInvites = [];
+      try {
+        liveInvites = [...(await interaction.guild.invites.fetch()).values()];
+      } catch (error) {
+        console.error('[OTM] /invites davet bağlantıları okunamadı:', error);
+      }
+
+      const usageByInviter = new Map();
+      for (const invite of liveInvites) {
+        if (!invite.inviter?.id) continue;
+        const item = usageByInviter.get(invite.inviter.id) || { uses: 0, codes: [] };
+        item.uses += Number(invite.uses || 0);
+        if (invite.code) item.codes.push(invite.code);
+        usageByInviter.set(invite.inviter.id, item);
+      }
+
+      const trackedByInviter = new Map();
+      for (const entry of inviteData.entries) {
+        const item = trackedByInviter.get(entry.inviterId) || { total: 0, active: 0, left: 0, members: [] };
+        item.total++;
+        if (entry.active === true) item.active++;
+        else item.left++;
+        item.members.push(entry);
+        trackedByInviter.set(entry.inviterId, item);
+      }
+
+      const leaderboardIds = new Set([...usageByInviter.keys(), ...trackedByInviter.keys()]);
+      const leaderboard = [...leaderboardIds].map(userId => ({
+        userId,
+        uses: usageByInviter.get(userId)?.uses || 0,
+        ...(trackedByInviter.get(userId) || { total: 0, active: 0, left: 0 })
+      })).sort((a, b) => b.uses - a.uses || b.total - a.total).slice(0, 10);
+
+      const leaderboardText = leaderboard.length
+        ? leaderboard.map((item, index) =>
+          `**${index + 1}.** <@\u200b${item.userId}> — **${item.uses}** bağlantı kullanımı | ${item.total} kayıtlı katılım (${item.active} içeride, ${item.left} ayrıldı)`
+        ).join('\\n')
+        : 'Henüz davet verisi bulunamadı.';
+
+      const latestEntries = [...inviteData.entries]
+        .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
+        .slice(0, 10);
+      const latestText = latestEntries.length
+        ? latestEntries.map(entry =>
+          `• <@\u200b${entry.memberId}> ← <@\u200b${entry.inviterId}> (${entry.active === true ? 'sunucuda' : 'ayrıldı'}) · \` ${entry.inviteCode || 'kod yok'} \``
+        ).join('\\n')
+        : 'Botun kayıt altına aldığı katılım henüz yok.';
+
+      const personalUsage = usageByInviter.get(interaction.user.id)?.uses || 0;
       const inviteEmbed = new EmbedBuilder()
         .setColor(0x5865F2)
-        .setTitle('📨 Davet İstatistiklerin')
-        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
-        .setDescription(`${interaction.user} adlı kullanıcının davet bilgileri`)
+        .setTitle('📨 Sunucu Davet İstatistikleri')
+        .setDescription('Davet bağlantılarının toplam kullanımını, davet sıralamasını ve botun kaydettiği üye eşleşmelerini burada görebilirsin.')
         .addFields(
-          { name: 'Toplam Davet', value: `**${total}**`, inline: true },
-          { name: 'Sunucuda Olan', value: `**${active}**`, inline: true },
-          { name: 'Ayrılan', value: `**${left}**`, inline: true }
+          { name: 'Senin Davetlerin', value: `Bağlantı kullanımı: **${personalUsage}**\\nKayıtlı katılım: **${ownTotal}**\\nSunucuda: **${ownActive}** · Ayrılan: **${ownLeft}**`, inline: false },
+          { name: '🏆 Davet Sıralaması', value: leaderboardText.slice(0, 1024), inline: false },
+          { name: '🧾 Son Davet Edilen Üyeler', value: latestText.slice(0, 1024), inline: false }
         )
-        .setFooter({ text: 'Davet sayıları botun takip edebildiği katılımlara göre hesaplanır.' })
+        .setFooter({ text: 'Bağlantı kullanımı Discord toplamıdır; üye eşleşmeleri yalnızca botun kaydettiği katılımlardır.' })
         .setTimestamp();
-      return interaction.reply({ embeds: [inviteEmbed], ephemeral: true });
+
+      return interaction.editReply({ embeds: [inviteEmbed] });
     }
 
     if (interaction.isChatInputCommand() && interaction.commandName === 'botyaz') {
