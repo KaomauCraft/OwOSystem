@@ -53,6 +53,7 @@ let inviteData = readJson(INVITES_FILE, { entries: [], totals: {} });
 if (!Array.isArray(inviteData.entries)) inviteData.entries = [];
 if (!inviteData.totals || typeof inviteData.totals !== 'object') inviteData.totals = {};
 if (!inviteData.welcomeSent || typeof inviteData.welcomeSent !== 'object') inviteData.welcomeSent = {};
+if (!inviteData.welcomeAssignments || typeof inviteData.welcomeAssignments !== 'object') inviteData.welcomeAssignments = {};
 const inviteCache = new Map();
 let inventoryBusy = false;
 
@@ -239,8 +240,8 @@ client.once('ready', async () => {
     console.error('[OTM] Davetler okunamadı. Botta Sunucuyu Yönet izni olmalı:', error);
   }
 
-  // Bot ilk kez bu sürümle açıldığında sunucudaki mevcut insan üyeleri bir kez karşıla.
-  // Davet bilgisi geçmişte kaydedilmemiş üyelerde davet eden kişi bilinemez.
+  // Eski üyeler için kullanıcı isteğiyle 26/2 rastgele dağıtım.
+  // Bu eşleştirme gerçek davet geçmişi değildir; rastgele atanmıştır.
   try {
     const welcomeChannel = await guild.channels.fetch('1575615011093745754');
     if (!welcomeChannel || !welcomeChannel.isTextBased()) {
@@ -248,27 +249,56 @@ client.once('ready', async () => {
     }
 
     const members = await guild.members.fetch();
-    let sentCount = 0;
-    for (const member of members.values()) {
-      if (member.user.bot || inviteData.welcomeSent[member.id]) continue;
+    const pending = [...members.values()]
+      .filter(member => !member.user.bot && !Object.prototype.hasOwnProperty.call(inviteData.welcomeAssignments, member.id));
 
-      const oldEntry = [...inviteData.entries].reverse().find(entry => entry.memberId === member.id);
-      const inviterId = oldEntry?.inviterId;
-      const inviterMention = inviterId ? `<@${inviterId}>` : 'davet eden kişi belirlenemedi';
-      const trackedTotal = inviterId
-        ? Number(inviteData.totals[inviterId] || inviteData.entries.filter(entry => entry.inviterId === inviterId).length)
-        : 0;
-
-      await welcomeChannel.send({
-        content: `Hoşgeldin, <@${member.id}>! Seni ${inviterMention} bu sunucuya davet etti ve sende girdin. Bundan ötürü Sana Çok Teşekkür Ederiz! ❤️ Şşş ${inviterMention}, senin toplam davetlerin \`${trackedTotal}\` oldu.`,
-        allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
-      });
-
-      inviteData.welcomeSent[member.id] = new Date().toISOString();
-      writeJson(INVITES_FILE, inviteData);
-      sentCount++;
+    for (let i = pending.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pending[i], pending[j]] = [pending[j], pending[i]];
     }
-    console.log(`[OTM] Eski üyeler için ${sentCount} tek seferlik karşılama mesajı gönderildi.`);
+
+    const assignments = [
+      ...Array(26).fill('1521872863995363479'),
+      ...Array(2).fill('1199429920896598118')
+    ];
+
+    const recentMessages = await welcomeChannel.messages.fetch({ limit: 100 }).catch(() => null);
+    let updatedCount = 0;
+    let sentCount = 0;
+
+    for (let i = 0; i < pending.length; i++) {
+      const member = pending[i];
+      const inviterId = assignments[i] || null;
+      const inviterMention = inviterId ? `<@${inviterId}>` : 'davet eden kişi belirlenemedi';
+      const inviterTotal = inviterId === '1521872863995363479' ? 26 : inviterId === '1199429920896598118' ? 2 : 0;
+      const content = `Hoşgeldin, <@${member.id}>! Seni ${inviterMention} bu sunucuya davet etti ve sende girdin. Bundan ötürü Sana Çok Teşekkür Ederiz! ❤️ Şşş ${inviterMention}, senin toplam davetlerin \`${inviterTotal}\` oldu. (Eski üyeler için rastgele eşleştirme)`;
+
+      const previousMessage = recentMessages?.find(message =>
+        message.author.id === client.user.id &&
+        message.content.includes(`<@${member.id}>`) &&
+        message.content.startsWith('Hoşgeldin,')
+      );
+
+      if (previousMessage) {
+        await previousMessage.edit({
+          content,
+          allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
+        });
+        updatedCount++;
+      } else {
+        await welcomeChannel.send({
+          content,
+          allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
+        });
+        sentCount++;
+      }
+
+      inviteData.welcomeSent[member.id] = inviteData.welcomeSent[member.id] || new Date().toISOString();
+      inviteData.welcomeAssignments[member.id] = inviterId;
+      writeJson(INVITES_FILE, inviteData);
+    }
+
+    console.log(`[OTM] Eski üyeler için ${updatedCount} mesaj güncellendi, ${sentCount} yeni mesaj gönderildi; 26/2 rastgele dağıtım uygulandı.`);
   } catch (error) {
     console.error('[OTM] Eski üye karşılama işlemi tamamlanamadı:', error);
   }
