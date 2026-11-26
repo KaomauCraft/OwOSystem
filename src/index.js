@@ -215,6 +215,27 @@ client.once('ready', async () => {
   console.log(`[OTM] ${client.user.tag} olarak giriş yapıldı.`);
   const guild = await client.guilds.fetch(config.guildId);
 
+  // OwO Cash animasyonlu sunucu emojisini yalnızca bir kez oluştur.
+  try {
+    await guild.emojis.fetch();
+    const existingEmoji = guild.emojis.cache.find(emoji => emoji.name === 'owo_cash');
+    if (!existingEmoji) {
+      const emojiResponse = await fetch('https://cdn3.emoji.gg/emojis/86782-owo.gif');
+      if (!emojiResponse.ok) throw new Error(`Emoji görseli indirilemedi: HTTP ${emojiResponse.status}`);
+      const emojiBuffer = Buffer.from(await emojiResponse.arrayBuffer());
+      const createdEmoji = await guild.emojis.create({
+        attachment: emojiBuffer,
+        name: 'owo_cash',
+        reason: 'OwO Cash satış paneli emojisi'
+      });
+      console.log(`[OTM] Sunucu emojisi oluşturuldu: :${createdEmoji.name}:`);
+    } else {
+      console.log('[OTM] :owo_cash: emojisi zaten mevcut, tekrar oluşturulmadı.');
+    }
+  } catch (error) {
+    console.error('[OTM] owo_cash emojisi eklenemedi. Botta Emojileri Yönet izni olduğundan emin olun:', error);
+  }
+
   await guild.commands.set([
     new SlashCommandBuilder()
       .setName('botyaz')
