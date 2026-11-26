@@ -52,6 +52,7 @@ let inventory = readJson(CODES_FILE, []);
 let inviteData = readJson(INVITES_FILE, { entries: [], totals: {} });
 if (!Array.isArray(inviteData.entries)) inviteData.entries = [];
 if (!inviteData.totals || typeof inviteData.totals !== 'object') inviteData.totals = {};
+if (!inviteData.welcomeSent || typeof inviteData.welcomeSent !== 'object') inviteData.welcomeSent = {};
 const inviteCache = new Map();
 let inventoryBusy = false;
 
@@ -238,6 +239,40 @@ client.once('ready', async () => {
     console.error('[OTM] Davetler okunamadı. Botta Sunucuyu Yönet izni olmalı:', error);
   }
 
+  // Bot ilk kez bu sürümle açıldığında sunucudaki mevcut insan üyeleri bir kez karşıla.
+  // Davet bilgisi geçmişte kaydedilmemiş üyelerde davet eden kişi bilinemez.
+  try {
+    const welcomeChannel = await guild.channels.fetch('1575615011093745754');
+    if (!welcomeChannel || !welcomeChannel.isTextBased()) {
+      throw new Error('Davet karşılama kanalı bulunamadı veya yazı kanalı değil.');
+    }
+
+    const members = await guild.members.fetch();
+    let sentCount = 0;
+    for (const member of members.values()) {
+      if (member.user.bot || inviteData.welcomeSent[member.id]) continue;
+
+      const oldEntry = [...inviteData.entries].reverse().find(entry => entry.memberId === member.id);
+      const inviterId = oldEntry?.inviterId;
+      const inviterMention = inviterId ? `<@${inviterId}>` : 'davet eden kişi belirlenemedi';
+      const trackedTotal = inviterId
+        ? Number(inviteData.totals[inviterId] || inviteData.entries.filter(entry => entry.inviterId === inviterId).length)
+        : 0;
+
+      await welcomeChannel.send({
+        content: `Hoşgeldin, <@${member.id}>! Seni ${inviterMention} bu sunucuya davet etti ve sende girdin. Bundan ötürü Sana Çok Teşekkür Ederiz! ❤️ Şşş ${inviterMention}, senin toplam davetlerin \`${trackedTotal}\` oldu.`,
+        allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
+      });
+
+      inviteData.welcomeSent[member.id] = new Date().toISOString();
+      writeJson(INVITES_FILE, inviteData);
+      sentCount++;
+    }
+    console.log(`[OTM] Eski üyeler için ${sentCount} tek seferlik karşılama mesajı gönderildi.`);
+  } catch (error) {
+    console.error('[OTM] Eski üye karşılama işlemi tamamlanamadı:', error);
+  }
+
   // OwO Cash fiyat listesini kutulu embed olarak gönder/güncelle.
   try {
     const owoChannel = await guild.channels.fetch(config.channels.discordOwo);
@@ -385,6 +420,13 @@ client.once('ready', async () => {
 
 client.on('guildMemberAdd', async member => {
   try {
+    // Bot hesaplarına karşılama mesajı gönderme.
+    if (member.user.bot) {
+      const botRoleId = config.roles.bot;
+      if (botRoleId) await member.roles.add(botRoleId, 'Sunucuya katılan bot/uygulama hesabı').catch(() => {});
+      return;
+    }
+
     // Yeni katılımdan sonra kullanım sayısı artan davet bağlantısını bul.
     try {
       const currentInvites = await member.guild.invites.fetch();
@@ -433,6 +475,8 @@ client.on('guildMemberAdd', async member => {
           content: `Hoşgeldin, <@${member.id}>! Seni ${inviterMention} bu sunucuya davet etti ve sende girdin. Bundan ötürü Sana Çok Teşekkür Ederiz! ❤️ Şşş ${inviterMention}, senin toplam davetlerin \`${inviterTotal}\` oldu.`,
           allowedMentions: { users: [member.id, ...(inviterId ? [inviterId] : [])] }
         });
+        inviteData.welcomeSent[member.id] = new Date().toISOString();
+        writeJson(INVITES_FILE, inviteData);
       }
     } catch (error) {
       console.error('[OTM] Davet karşılama mesajı gönderilemedi:', error);
