@@ -218,19 +218,25 @@ client.once('ready', async () => {
   // OwO Cash animasyonlu sunucu emojisini yalnızca bir kez oluştur.
   try {
     await guild.emojis.fetch();
-    const existingEmoji = guild.emojis.cache.find(emoji => emoji.name === 'owo_cash');
-    if (!existingEmoji) {
-      const emojiResponse = await fetch('https://cdn3.emoji.gg/emojis/86782-owo.gif');
-      if (!emojiResponse.ok) throw new Error(`Emoji görseli indirilemedi: HTTP ${emojiResponse.status}`);
+    const emojiDefinitions = [
+      { name: 'owo_cash', url: 'https://cdn3.emoji.gg/emojis/86782-owo.gif', reason: 'OwO Cash emojisi' },
+      { name: 'offline', url: 'https://cdn3.emoji.gg/emojis/11877-offline.png', reason: 'Offline emojisi' }
+    ];
+    for (const definition of emojiDefinitions) {
+      const existingEmoji = guild.emojis.cache.find(emoji => emoji.name === definition.name);
+      if (existingEmoji) {
+        console.log(`[OTM] :${definition.name}: emojisi zaten mevcut, tekrar oluşturulmadı.`);
+        continue;
+      }
+      const emojiResponse = await fetch(definition.url);
+      if (!emojiResponse.ok) throw new Error(`${definition.name} görseli indirilemedi: HTTP ${emojiResponse.status}`);
       const emojiBuffer = Buffer.from(await emojiResponse.arrayBuffer());
       const createdEmoji = await guild.emojis.create({
         attachment: emojiBuffer,
-        name: 'owo_cash',
-        reason: 'OwO Cash satış paneli emojisi'
+        name: definition.name,
+        reason: definition.reason
       });
       console.log(`[OTM] Sunucu emojisi oluşturuldu: :${createdEmoji.name}:`);
-    } else {
-      console.log('[OTM] :owo_cash: emojisi zaten mevcut, tekrar oluşturulmadı.');
     }
   } catch (error) {
     console.error('[OTM] owo_cash emojisi eklenemedi. Botta Emojileri Yönet izni olduğundan emin olun:', error);
