@@ -250,7 +250,7 @@ client.once('ready', async () => {
         `${icon} **800.000 OwO Cash = 8 TL**`,
         `${icon} **900.000 OwO Cash = 9 TL**`,
         `${icon} [**1.000.000 OwO Cash = 10 TL**](https://hesap.com.tr/ilan/1522282-1000000-owo-cash-otomatik-teslimat)`
-      ].join('\\n'))
+      ].join('\n'))
       .setFooter({ text: 'Satın almak için bağlantılı fiyatlara tıklayabilirsin.' });
 
     let existingPriceMessage = null;
