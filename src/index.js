@@ -43,7 +43,8 @@ const state = readJson(STATE_FILE, {
   supportPanelMessageId: null,
   deliveryPanelMessageId: null,
   supportCounter: 0,
-  deliveryCounter: 0
+  deliveryCounter: 0,
+  owoCashPriceMessageId: null
 });
 
 let inventory = readJson(CODES_FILE, []);
@@ -214,6 +215,56 @@ async function ensurePanel(guild, channelId, stateKey, embed, button) {
 client.once('ready', async () => {
   console.log(`[OTM] ${client.user.tag} olarak giriş yapıldı.`);
   const guild = await client.guilds.fetch(config.guildId);
+
+  // OwO Cash fiyat listesini kanala yalnızca bir kez gönder.
+  try {
+    const owoChannel = await guild.channels.fetch(config.channels.discordOwo);
+    if (!owoChannel || !owoChannel.isTextBased()) {
+      throw new Error('OwO Cash kanalı bulunamadı veya yazı kanalı değil.');
+    }
+
+    let existingPriceMessage = null;
+    if (state.owoCashPriceMessageId) {
+      existingPriceMessage = await owoChannel.messages.fetch(state.owoCashPriceMessageId).catch(() => null);
+    }
+    if (!existingPriceMessage) {
+      const recentMessages = await owoChannel.messages.fetch({ limit: 100 }).catch(() => null);
+      existingPriceMessage = recentMessages?.find(message =>
+        message.author.id === client.user.id &&
+        message.content.includes('OwO Cash Fiyat Listesi')
+      ) || null;
+    }
+
+    if (existingPriceMessage) {
+      state.owoCashPriceMessageId = existingPriceMessage.id;
+      writeJson(STATE_FILE, state);
+      console.log('[OTM] OwO Cash fiyat listesi zaten mevcut, tekrar gönderilmedi.');
+    } else {
+      const priceMessage = [
+        ':shopping_cart: **OwO Cash Fiyat Listesi**',
+        '100.000 OwO Cash = 1 TL',
+        '200.000 OwO Cash = 2 TL',
+        '300.000 OwO Cash = 3 TL',
+        '400.000 OwO Cash = 4 TL',
+        '[500.000 OwO Cash = 5 TL](https://hesap.com.tr/ilan/1522239-500000-owo-cash-otomatik-teslimat)',
+        '600.000 OwO Cash = 6 TL',
+        '700.000 OwO Cash = 7 TL',
+        '800.000 OwO Cash = 8 TL',
+        '900.000 OwO Cash = 9 TL',
+        '[1.000.000 OwO Cash = 10 TL](https://hesap.com.tr/ilan/1522282-1000000-owo-cash-otomatik-teslimat)'
+      ].join('\\n');
+
+      const sentMessage = await owoChannel.send({
+        content: priceMessage,
+        allowedMentions: { parse: [] }
+      });
+      state.owoCashPriceMessageId = sentMessage.id;
+      writeJson(STATE_FILE, state);
+      console.log('[OTM] OwO Cash fiyat listesi kanala gönderildi.');
+    }
+  } catch (error) {
+    console.error('[OTM] OwO Cash fiyat listesi gönderilemedi:', error);
+  }
 
   // OwO Cash animasyonlu sunucu emojisini yalnızca bir kez oluştur.
   try {
