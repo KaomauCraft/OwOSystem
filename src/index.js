@@ -22,6 +22,7 @@ const config = require('./config');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const CODES_FILE = path.join(DATA_DIR, 'codes.json');
+const INVITES_FILE = path.join(DATA_DIR, 'invites.json');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -48,10 +49,13 @@ const state = readJson(STATE_FILE, {
 });
 
 let inventory = readJson(CODES_FILE, []);
+let inviteData = readJson(INVITES_FILE, { entries: [] });
+if (!Array.isArray(inviteData.entries)) inviteData.entries = [];
+const inviteCache = new Map();
 let inventoryBusy = false;
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildInvites],
   partials: [Partials.Channel]
 });
 
@@ -75,6 +79,15 @@ function formatDuration(milliseconds) {
   if (hours) parts.push(hours + ' Saat');
   if (minutes || parts.length === 0) parts.push(minutes + ' Dakika');
   return parts.join(' ');
+}
+
+async function refreshInviteCache(guild) {
+  const invites = await guild.invites.fetch();
+  inviteCache.clear();
+  for (const invite of invites.values()) {
+    inviteCache.set(invite.code, Number(invite.uses || 0));
+  }
+  return invites;
 }
 
 async function sendLog(guild, title, description, color = 0x5865F2) {
@@ -216,6 +229,14 @@ client.once('ready', async () => {
   console.log(`[OTM] ${client.user.tag} olarak giriş yapıldı.`);
   const guild = await client.guilds.fetch(config.guildId);
 
+  // Davet kullanım sayılarını başlangıçta önbelleğe al.
+  try {
+    await refreshInviteCache(guild);
+    console.log(`[OTM] ${inviteCache.size} davet bağlantısı önbelleğe alındı.`);
+  } catch (error) {
+    console.error('[OTM] Davetler okunamadı. Botta Sunucuyu Yönet izni olmalı:', error);
+  }
+
   // OwO Cash fiyat listesini kutulu embed olarak gönder/güncelle.
   try {
     const owoChannel = await guild.channels.fetch(config.channels.discordOwo);
@@ -327,6 +348,10 @@ client.once('ready', async () => {
           .setRequired(true)
           .setMaxLength(2000)
       )
+      .toJSON(),
+    new SlashCommandBuilder()
+      .setName('invites')
+      .setDescription('Davet istatistiklerini görüntüler.')
       .toJSON()
   ]);
 
@@ -359,6 +384,35 @@ client.once('ready', async () => {
 
 client.on('guildMemberAdd', async member => {
   try {
+    // Yeni katılımdan sonra kullanım sayısı artan davet bağlantısını bul.
+    try {
+      const currentInvites = await member.guild.invites.fetch();
+      let usedInvite = null;
+      let highestIncrease = 0;
+      for (const invite of currentInvites.values()) {
+        const previousUses = inviteCache.get(invite.code) || 0;
+        const currentUses = Number(invite.uses || 0);
+        const increase = currentUses - previousUses;
+        if (increase > highestIncrease) {
+          highestIncrease = increase;
+          usedInvite = invite;
+        }
+        inviteCache.set(invite.code, currentUses);
+      }
+      if (usedInvite?.inviter?.id) {
+        inviteData.entries.push({
+          memberId: member.id,
+          inviterId: usedInvite.inviter.id,
+          inviteCode: usedInvite.code,
+          joinedAt: new Date().toISOString(),
+          active: true
+        });
+        writeJson(INVITES_FILE, inviteData);
+      }
+    } catch (error) {
+      console.error('[OTM] Üye daveti tespit edilemedi. Sunucuyu Yönet iznini kontrol edin:', error);
+    }
+
     const roleId = member.user.bot ? config.roles.bot : config.roles.member;
     if (!roleId) {
       console.error('[OTM] Giriş rolü ayarlanmamış:', member.user.bot ? 'bot' : 'üye');
@@ -378,8 +432,47 @@ client.on('guildMemberAdd', async member => {
   }
 });
 
+client.on('guildMemberRemove', member => {
+  const previousEntry = [...inviteData.entries].reverse().find(entry =>
+    entry.memberId === member.id && entry.active === true
+  );
+  if (previousEntry) {
+    previousEntry.active = false;
+    previousEntry.leftAt = new Date().toISOString();
+    writeJson(INVITES_FILE, inviteData);
+  }
+});
+
+client.on('inviteCreate', invite => {
+  inviteCache.set(invite.code, Number(invite.uses || 0));
+});
+
+client.on('inviteDelete', invite => {
+  inviteCache.delete(invite.code);
+});
+
 client.on('interactionCreate', async interaction => {
   try {
+    if (interaction.isChatInputCommand() && interaction.commandName === 'invites') {
+      const ownEntries = inviteData.entries.filter(entry => entry.inviterId === interaction.user.id);
+      const total = ownEntries.length;
+      const active = ownEntries.filter(entry => entry.active === true).length;
+      const left = total - active;
+      const inviteEmbed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle('📨 Davet İstatistiklerin')
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+        .setDescription(`${interaction.user} adlı kullanıcının davet bilgileri`)
+        .addFields(
+          { name: 'Toplam Davet', value: `**${total}**`, inline: true },
+          { name: 'Sunucuda Olan', value: `**${active}**`, inline: true },
+          { name: 'Ayrılan', value: `**${left}**`, inline: true }
+        )
+        .setFooter({ text: 'Davet sayıları botun takip edebildiği katılımlara göre hesaplanır.' })
+        .setTimestamp();
+      return interaction.reply({ embeds: [inviteEmbed], ephemeral: true });
+    }
+
     if (interaction.isChatInputCommand() && interaction.commandName === 'botyaz') {
       if (!isStaff(interaction.member)) {
         return interaction.reply({
