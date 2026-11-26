@@ -216,12 +216,42 @@ client.once('ready', async () => {
   console.log(`[OTM] ${client.user.tag} olarak giriş yapıldı.`);
   const guild = await client.guilds.fetch(config.guildId);
 
-  // OwO Cash fiyat listesini kanala yalnızca bir kez gönder.
+  // OwO Cash fiyat listesini kutulu embed olarak gönder/güncelle.
   try {
     const owoChannel = await guild.channels.fetch(config.channels.discordOwo);
     if (!owoChannel || !owoChannel.isTextBased()) {
       throw new Error('OwO Cash kanalı bulunamadı veya yazı kanalı değil.');
     }
+
+    await guild.emojis.fetch();
+    let owoEmoji = guild.emojis.cache.find(emoji => emoji.name === 'owo_cash');
+    if (!owoEmoji) {
+      const response = await fetch('https://cdn3.emoji.gg/emojis/86782-owo.gif');
+      if (!response.ok) throw new Error('owo_cash görseli indirilemedi.');
+      owoEmoji = await guild.emojis.create({
+        attachment: Buffer.from(await response.arrayBuffer()),
+        name: 'owo_cash',
+        reason: 'OwO Cash fiyat listesinde kullanılacak sunucu emojisi'
+      });
+    }
+
+    const icon = owoEmoji.toString();
+    const priceEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🛒・OwO Cash Fiyat Listesi')
+      .setDescription([
+        `${icon} **100.000 OwO Cash = 1 TL**`,
+        `${icon} **200.000 OwO Cash = 2 TL**`,
+        `${icon} **300.000 OwO Cash = 3 TL**`,
+        `${icon} **400.000 OwO Cash = 4 TL**`,
+        `${icon} [**500.000 OwO Cash = 5 TL**](https://hesap.com.tr/ilan/1522239-500000-owo-cash-otomatik-teslimat)`,
+        `${icon} **600.000 OwO Cash = 6 TL**`,
+        `${icon} **700.000 OwO Cash = 7 TL**`,
+        `${icon} **800.000 OwO Cash = 8 TL**`,
+        `${icon} **900.000 OwO Cash = 9 TL**`,
+        `${icon} [**1.000.000 OwO Cash = 10 TL**](https://hesap.com.tr/ilan/1522282-1000000-owo-cash-otomatik-teslimat)`
+      ].join('\\n'))
+      .setFooter({ text: 'Satın almak için bağlantılı fiyatlara tıklayabilirsin.' });
 
     let existingPriceMessage = null;
     if (state.owoCashPriceMessageId) {
@@ -231,39 +261,31 @@ client.once('ready', async () => {
       const recentMessages = await owoChannel.messages.fetch({ limit: 100 }).catch(() => null);
       existingPriceMessage = recentMessages?.find(message =>
         message.author.id === client.user.id &&
-        message.content.includes('OwO Cash Fiyat Listesi')
+        (message.content.includes('OwO Cash Fiyat Listesi') ||
+          message.embeds.some(embed => embed.title?.includes('OwO Cash Fiyat Listesi')))
       ) || null;
     }
 
     if (existingPriceMessage) {
+      await existingPriceMessage.edit({
+        content: '',
+        embeds: [priceEmbed],
+        allowedMentions: { parse: [] }
+      });
       state.owoCashPriceMessageId = existingPriceMessage.id;
       writeJson(STATE_FILE, state);
-      console.log('[OTM] OwO Cash fiyat listesi zaten mevcut, tekrar gönderilmedi.');
+      console.log('[OTM] OwO Cash fiyat listesi kutulu tasarımla güncellendi.');
     } else {
-      const priceMessage = [
-        ':shopping_cart: **OwO Cash Fiyat Listesi**',
-        '100.000 OwO Cash = 1 TL',
-        '200.000 OwO Cash = 2 TL',
-        '300.000 OwO Cash = 3 TL',
-        '400.000 OwO Cash = 4 TL',
-        '[500.000 OwO Cash = 5 TL](https://hesap.com.tr/ilan/1522239-500000-owo-cash-otomatik-teslimat)',
-        '600.000 OwO Cash = 6 TL',
-        '700.000 OwO Cash = 7 TL',
-        '800.000 OwO Cash = 8 TL',
-        '900.000 OwO Cash = 9 TL',
-        '[1.000.000 OwO Cash = 10 TL](https://hesap.com.tr/ilan/1522282-1000000-owo-cash-otomatik-teslimat)'
-      ].join('\\n');
-
       const sentMessage = await owoChannel.send({
-        content: priceMessage,
+        embeds: [priceEmbed],
         allowedMentions: { parse: [] }
       });
       state.owoCashPriceMessageId = sentMessage.id;
       writeJson(STATE_FILE, state);
-      console.log('[OTM] OwO Cash fiyat listesi kanala gönderildi.');
+      console.log('[OTM] OwO Cash fiyat listesi kutulu tasarımla gönderildi.');
     }
   } catch (error) {
-    console.error('[OTM] OwO Cash fiyat listesi gönderilemedi:', error);
+    console.error('[OTM] OwO Cash fiyat listesi gönderilemedi/güncellenemedi:', error);
   }
 
   // OwO Cash animasyonlu sunucu emojisini yalnızca bir kez oluştur.
