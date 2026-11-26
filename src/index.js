@@ -498,8 +498,8 @@ client.on('interactionCreate', async interaction => {
 
       const leaderboardText = leaderboard.length
         ? leaderboard.map((item, index) =>
-          `**${index + 1}.** <@\u200b${item.userId}> — **${item.uses}** bağlantı kullanımı | ${item.total} kayıtlı katılım (${item.active} içeride, ${item.left} ayrıldı)`
-        ).join('\\n')
+          `**${index + 1}.** <@${item.userId}> — **${item.uses}** bağlantı kullanımı | ${item.total} kayıtlı katılım (${item.active} içeride, ${item.left} ayrıldı)`
+        ).join('\n')
         : 'Henüz davet verisi bulunamadı.';
 
       const latestEntries = [...inviteData.entries]
@@ -507,8 +507,8 @@ client.on('interactionCreate', async interaction => {
         .slice(0, 10);
       const latestText = latestEntries.length
         ? latestEntries.map(entry =>
-          `• <@\u200b${entry.memberId}> ← <@\u200b${entry.inviterId}> (${entry.active === true ? 'sunucuda' : 'ayrıldı'}) · \` ${entry.inviteCode || 'kod yok'} \``
-        ).join('\\n')
+          `• <@${entry.memberId}> ← <@${entry.inviterId}> (${entry.active === true ? 'sunucuda' : 'ayrıldı'}) · \` ${entry.inviteCode || 'kod yok'} \``
+        ).join('\n')
         : 'Botun kayıt altına aldığı katılım henüz yok.';
 
       const personalUsage = usageByInviter.get(interaction.user.id)?.uses || 0;
@@ -517,7 +517,7 @@ client.on('interactionCreate', async interaction => {
         .setTitle('📨 Sunucu Davet İstatistikleri')
         .setDescription('Davet bağlantılarının toplam kullanımını, davet sıralamasını ve botun kaydettiği üye eşleşmelerini burada görebilirsin.')
         .addFields(
-          { name: 'Senin Davetlerin', value: `Bağlantı kullanımı: **${personalUsage}**\\nKayıtlı katılım: **${ownTotal}**\\nSunucuda: **${ownActive}** · Ayrılan: **${ownLeft}**`, inline: false },
+          { name: 'Senin Davetlerin', value: `Bağlantı kullanımı: **${personalUsage}**\nKayıtlı katılım: **${ownTotal}**\nSunucuda: **${ownActive}** · Ayrılan: **${ownLeft}**`, inline: false },
           { name: '🏆 Davet Sıralaması', value: leaderboardText.slice(0, 1024), inline: false },
           { name: '🧾 Son Davet Edilen Üyeler', value: latestText.slice(0, 1024), inline: false }
         )
