@@ -388,6 +388,18 @@ client.once('ready', async () => {
     new SlashCommandBuilder()
       .setName('invites')
       .setDescription('Davet istatistiklerini görüntüler.')
+      .toJSON(),
+    new SlashCommandBuilder()
+      .setName('mesajsil')
+      .setDescription('Kanaldaki son mesajları siler.')
+      .addIntegerOption(option =>
+        option.setName('miktar')
+          .setDescription('Silinecek mesaj sayısı (1-100)')
+          .setRequired(true)
+          .setMinValue(1)
+          .setMaxValue(100)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
       .toJSON()
   ]);
 
@@ -522,6 +534,22 @@ client.on('inviteDelete', invite => {
 
 client.on('interactionCreate', async interaction => {
   try {
+    if (interaction.isChatInputCommand() && interaction.commandName === 'mesajsil') {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+        return interaction.reply({ content: 'Bu komutu kullanmak için Mesajları Yönet yetkisine sahip olmalısın.', ephemeral: true });
+      }
+
+      const amount = interaction.options.getInteger('miktar', true);
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        const deleted = await interaction.channel.bulkDelete(amount, true);
+        return interaction.editReply(`🗑️ ${deleted.size} mesaj silindi. 14 günden eski mesajlar Discord sınırı nedeniyle toplu silinemedi.`);
+      } catch (error) {
+        console.error('[OTM] /mesajsil başarısız:', error);
+        return interaction.editReply('Mesajlar silinemedi. Botun bu kanalda Mesajları Yönet izni olduğundan emin ol.');
+      }
+    }
+
     if (interaction.isChatInputCommand() && interaction.commandName === 'invites') {
       await interaction.deferReply({ ephemeral: true });
 
