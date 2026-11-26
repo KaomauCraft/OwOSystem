@@ -267,23 +267,19 @@ client.once('ready', async () => {
     }
 
     if (existingPriceMessage) {
-      await existingPriceMessage.edit({
-        content: '',
-        embeds: [priceEmbed],
-        allowedMentions: { parse: [] }
+      // Eski mesajı düzenlemek tarihini değiştirmez; eskiyi silip güncel tarihli yeni mesaj gönder.
+      await existingPriceMessage.delete().catch(error => {
+        console.error('[OTM] Eski fiyat listesi silinemedi:', error);
       });
-      state.owoCashPriceMessageId = existingPriceMessage.id;
-      writeJson(STATE_FILE, state);
-      console.log('[OTM] OwO Cash fiyat listesi kutulu tasarımla güncellendi.');
-    } else {
-      const sentMessage = await owoChannel.send({
-        embeds: [priceEmbed],
-        allowedMentions: { parse: [] }
-      });
-      state.owoCashPriceMessageId = sentMessage.id;
-      writeJson(STATE_FILE, state);
-      console.log('[OTM] OwO Cash fiyat listesi kutulu tasarımla gönderildi.');
     }
+
+    const sentMessage = await owoChannel.send({
+      embeds: [priceEmbed],
+      allowedMentions: { parse: [] }
+    });
+    state.owoCashPriceMessageId = sentMessage.id;
+    writeJson(STATE_FILE, state);
+    console.log('[OTM] OwO Cash fiyat listesi yeni mesaj olarak gönderildi.');
   } catch (error) {
     console.error('[OTM] OwO Cash fiyat listesi gönderilemedi/güncellenemedi:', error);
   }
